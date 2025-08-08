@@ -45,7 +45,7 @@ type Order struct {
 	Payment           Payment  `json:"payment" binding:"required"`
 	Items             []Item   `json:"items" binding:"required"`
 	Locale            string   `json:"locale" binding:"required"`
-	InternalSignature string   `json:"internal_signature" binding:"required"`
+	InternalSignature string   `json:"internal_signature"`
 	CustomerId        string   `json:"customer_id" binding:"required"`
 	DeliveryService   string   `json:"delivery_service" binding:"required"`
 	Shardkey          string   `json:"shardkey" binding:"required"`

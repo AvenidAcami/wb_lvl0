@@ -6,9 +6,10 @@ import (
 	"github.com/segmentio/kafka-go"
 	"log"
 	"wb_lvl0/internal/model"
+	"wb_lvl0/internal/service"
 )
 
-func ParseOrders(reader *kafka.Reader) {
+func ParseOrders(reader *kafka.Reader, orderService service.IOrderService) {
 	var order model.Order
 	log.Println("Start parse orders")
 	for {
@@ -25,5 +26,9 @@ func ParseOrders(reader *kafka.Reader) {
 			continue
 		}
 
+		err = orderService.CreateOrder(order)
+		if err != nil {
+			log.Println("Error creating order:", err)
+		}
 	}
 }
