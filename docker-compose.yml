@@ -7,6 +7,7 @@ services:
       - ./.env:/app/.env
     depends_on:
       - kafka
+      - postgres
 
   postgres:
     image: postgres:17
@@ -25,7 +26,7 @@ services:
     volumes:
       - pg_data:/var/lib/postgresql/data
       - ./dump/user_dump.sql:/docker-entrypoint-initdb.d/user_dump.sql
-      - ./dump/wblvl0_2025-08-08_2-52-00.sql:/docker-entrypoint-initdb.d/wblvl0_2025-08-08_2-52-00.sql
+      - ./dump/wblvl0_2025-08-09_1-41-00.sql:/docker-entrypoint-initdb.d/wblvl0_2025-08-09_1-41-00.sql
 
   kafka:
     image: apache/kafka:3.7.0

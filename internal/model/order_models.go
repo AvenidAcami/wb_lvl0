@@ -53,3 +53,34 @@ type Order struct {
 	DateCreated       string   `json:"date_created" binding:"required"`
 	OofShard          string   `json:"oof_shard" binding:"required"`
 }
+
+type ItemToInsert struct {
+	Item
+	OrderUid string `json:"order_uid"`
+}
+
+type DeliveryToInsert struct {
+	Delivery
+	Id int `json:"id"`
+}
+
+type PaymentToInsert struct {
+	Payment
+	Id int `json:"id"`
+}
+
+type OrderToInsert struct {
+	OrderUid          string `json:"order_uid" binding:"required"`
+	TrackNumber       string `json:"track_number" binding:"required"`
+	Entry             string `json:"entry" binding:"required"`
+	DeliveryParamsId  int    `json:"delivery_params_id"`
+	PaymentId         int    `json:"payment_id"`
+	Locale            string `json:"locale" binding:"required"`
+	InternalSignature string `json:"internal_signature"`
+	CustomerId        string `json:"customer_id" binding:"required"`
+	DeliveryService   string `json:"delivery_service" binding:"required"`
+	Shardkey          string `json:"shardkey" binding:"required"`
+	SmId              int    `json:"sm_id" binding:"required"`
+	DateCreated       string `json:"date_created" binding:"required"`
+	OofShard          string `json:"oof_shard" binding:"required"`
+}

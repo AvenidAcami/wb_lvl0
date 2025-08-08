@@ -15,4 +15,4 @@ RUN chmod +x /wait-for-it.sh
 
 
 EXPOSE 8080
-CMD ["/wait-for-it.sh", "postgres:5432", "--", "./main"]
+CMD ["/bin/sh", "-c", "/wait-for-it.sh postgres:5432 -- /wait-for-it.sh kafka:9092 -- ./main"]

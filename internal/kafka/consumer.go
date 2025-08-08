@@ -13,7 +13,6 @@ func ParseOrders(reader *kafka.Reader, orderService service.IOrderService) {
 	var order model.Order
 	log.Println("Start parse orders")
 	for {
-		//TODO: Сделать передачу в сервис
 		m, err := reader.ReadMessage(context.Background())
 		if err != nil {
 			log.Println("Error reading message:", err)
