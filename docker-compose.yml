@@ -5,6 +5,8 @@ services:
       - "8080:8080"
     volumes:
       - ./.env:/app/.env
+    depends_on:
+      - kafka
 
   postgres:
     image: postgres:17
@@ -24,6 +26,25 @@ services:
       - pg_data:/var/lib/postgresql/data
       - ./dump/user_dump.sql:/docker-entrypoint-initdb.d/user_dump.sql
       - ./dump/wblvl0_2025-08-08_2-52-00.sql:/docker-entrypoint-initdb.d/wblvl0_2025-08-08_2-52-00.sql
+
+  kafka:
+    image: apache/kafka:3.7.0
+    ports:
+       - "9092:9092"
+    environment:
+      CLUSTER_ID: "5L6g3nShT-eMCtK--X86sw"
+      KAFKA_NODE_ID: "1"
+      KAFKA_PROCESS_ROLES: "controller,broker"
+      KAFKA_CONTROLLER_QUORUM_VOTERS: "1@kafka:9093"
+      KAFKA_LISTENERS: "PLAINTEXT://:9092,CONTROLLER://:9093"
+      KAFKA_ADVERTISED_LISTENERS: "PLAINTEXT://kafka:9092"
+      KAFKA_LISTENER_SECURITY_PROTOCOL_MAP: "CONTROLLER:PLAINTEXT,PLAINTEXT:PLAINTEXT"
+      KAFKA_INTER_BROKER_LISTENER_NAME: "PLAINTEXT"
+      KAFKA_CONTROLLER_LISTENER_NAMES: "CONTROLLER"
+      KAFKA_AUTO_CREATE_TOPICS_ENABLE: "true"
+      KAFKA_OFFSETS_TOPIC_REPLICATION_FACTOR: "1"
+    volumes:
+      - ./kafka-data:/tmp/kraft-combined-logs
 
 volumes:
   pg_data:
