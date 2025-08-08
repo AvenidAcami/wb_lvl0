@@ -1,0 +1,29 @@
+services:
+  go:
+    build: ./
+    ports:
+      - "8080:8080"
+    volumes:
+      - ./.env:/app/.env
+
+  postgres:
+    image: postgres:17
+    restart: unless-stopped
+    environment:
+      POSTGRES_PASSWORD: ${DB_PASSWORD}
+      POSTGRES_USER: postgres
+      POSTGRES_DB: ${DB_NAME}
+    healthcheck:
+      test: [ "CMD-SHELL", "pg_isready -U postgres" ]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+    ports:
+      - "5432:5432"
+    volumes:
+      - pg_data:/var/lib/postgresql/data
+      - ./dump/user_dump.sql:/docker-entrypoint-initdb.d/user_dump.sql
+      - ./dump/wblvl0_2025-08-08_2-52-00.sql:/docker-entrypoint-initdb.d/wblvl0_2025-08-08_2-52-00.sql
+
+volumes:
+  pg_data:
