@@ -8,10 +8,10 @@ import (
 )
 
 type OrderService struct {
-	repo *repository.IOrderRepository
+	repo repository.IOrderRepository
 }
 
-func NewOrderService(repo *repository.IOrderRepository) *OrderService {
+func NewOrderService(repo repository.IOrderRepository) *OrderService {
 	return &OrderService{repo: repo}
 }
 
@@ -128,6 +128,5 @@ func (serv *OrderService) CreateOrder(order model.Order) error {
 	if err != nil {
 		return err
 	}
-	// TODO: Добавить вставку в постгрес в репозитории и возвращать ошибку оттуда
-	return nil
+	return serv.repo.InsertOrder(order)
 }
