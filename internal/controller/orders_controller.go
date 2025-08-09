@@ -16,8 +16,14 @@ func NewOrdersController(serv service.IOrderService) *OrdersController {
 
 func (contr *OrdersController) GetOrder(c *gin.Context) {
 	orderUid := c.Param("order_uid")
-	order, err := contr.serv.GetOrder(orderUid)
+	order, err := contr.serv.GetOrder(c.Request.Context(), orderUid)
 	if err != nil {
+		if err.Error() == "context deadline exceeded" {
+			c.JSON(http.StatusGatewayTimeout, gin.H{
+				"error": "Server response timed out",
+			})
+			return
+		}
 		c.JSON(http.StatusBadRequest, gin.H{
 			"error": err.Error(),
 		})

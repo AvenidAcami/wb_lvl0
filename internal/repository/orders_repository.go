@@ -1,6 +1,7 @@
 package repository
 
 import (
+	"context"
 	"errors"
 	"gorm.io/gorm"
 	"log"
@@ -18,7 +19,7 @@ func NewOrderRepository(db *gorm.DB) *OrderRepository {
 
 type IOrderRepository interface {
 	InsertOrder(order model.Order) error
-	GetOrder(orderUid string) (model.Order, error)
+	GetOrder(orderUid string, ctx context.Context) (model.Order, error)
 }
 
 func (repo *OrderRepository) InsertOrder(order model.Order) error {
@@ -95,14 +96,14 @@ func (repo *OrderRepository) InsertOrder(order model.Order) error {
 	return tx.Commit().Error
 }
 
-func (repo *OrderRepository) GetOrder(orderUid string) (model.Order, error) {
+func (repo *OrderRepository) GetOrder(orderUid string, ctx context.Context) (model.Order, error) {
 	var order model.Order
 	var orderDB model.OrderDB
 	var paymentDB model.PaymentDB
 	var deliveryDB model.DeliveryDB
 	var itemsDB []model.ItemDB
 
-	err := repo.db.Table("orders").Where("order_uid = ?", orderUid).First(&orderDB).Error
+	err := repo.db.WithContext(ctx).Table("orders").Where("order_uid = ?", orderUid).First(&orderDB).Error
 	if err != nil {
 		if errors.Is(err, gorm.ErrRecordNotFound) {
 			return order, errors.New("order not found")
@@ -110,9 +111,10 @@ func (repo *OrderRepository) GetOrder(orderUid string) (model.Order, error) {
 		if strings.Contains(err.Error(), "invalid input syntax for type uuid") {
 			return order, errors.New("invalid UUID format")
 		}
+		return order, err
 	}
 
-	err = repo.db.Table("payments").Where("id = ?", orderDB.PaymentId).First(&paymentDB).Error
+	err = repo.db.WithContext(ctx).Table("payments").Where("id = ?", orderDB.PaymentId).First(&paymentDB).Error
 	if err != nil {
 		if err.Error() == "sql: no rows in result set" {
 			return order, errors.New("order not found")
@@ -120,7 +122,7 @@ func (repo *OrderRepository) GetOrder(orderUid string) (model.Order, error) {
 		return order, err
 	}
 
-	err = repo.db.Table("delivery_params").Where("id = ?", orderDB.DeliveryParamsId).First(&deliveryDB).Error
+	err = repo.db.WithContext(ctx).Table("delivery_params").Where("id = ?", orderDB.DeliveryParamsId).First(&deliveryDB).Error
 	if err != nil {
 		if err.Error() == "sql: no rows in result set" {
 			return order, errors.New("order not found")
@@ -128,7 +130,7 @@ func (repo *OrderRepository) GetOrder(orderUid string) (model.Order, error) {
 		return order, err
 	}
 
-	err = repo.db.Table("ordered_items").Where("order_uid = ?", orderDB.OrderUid).Find(&itemsDB).Error
+	err = repo.db.WithContext(ctx).Table("ordered_items").Where("order_uid = ?", orderDB.OrderUid).Find(&itemsDB).Error
 	if err != nil {
 		if err.Error() == "sql: no rows in result set" {
 			return order, errors.New("order not found")

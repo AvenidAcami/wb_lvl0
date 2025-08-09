@@ -1,8 +1,10 @@
 package service
 
 import (
+	"context"
 	"errors"
 	"fmt"
+	"time"
 	"wb_lvl0/internal/model"
 	"wb_lvl0/internal/repository"
 )
@@ -17,7 +19,7 @@ func NewOrderService(repo repository.IOrderRepository) *OrderService {
 
 type IOrderService interface {
 	CreateOrder(order model.Order) error
-	GetOrder(order_uid string) (model.Order, error)
+	GetOrder(ctx context.Context, orderUid string) (model.Order, error)
 }
 
 func (serv *OrderService) validateOrderInfo(order model.Order) error {
@@ -118,7 +120,8 @@ func (serv *OrderService) validateRequiredStrings(fields map[string]string) erro
 func (serv *OrderService) validateRequiredInts(fields map[string]int) error {
 	for name, value := range fields {
 		if value == 0 {
-			return fmt.Errorf("%s is required and must be non-zero", name)
+			return fmt.Errorf("%s is required", name)
+
 		}
 	}
 	return nil
@@ -132,6 +135,12 @@ func (serv *OrderService) CreateOrder(order model.Order) error {
 	return serv.repo.InsertOrder(order)
 }
 
-func (serv *OrderService) GetOrder(orderUid string) (model.Order, error) {
-	return serv.repo.GetOrder(orderUid)
+func (serv *OrderService) GetOrder(ctx context.Context, orderUid string) (model.Order, error) {
+	timeoutCtx, cancel := serv.createContext(ctx)
+	defer cancel()
+	return serv.repo.GetOrder(orderUid, timeoutCtx)
+}
+
+func (serv *OrderService) createContext(ctx context.Context) (context.Context, context.CancelFunc) {
+	return context.WithTimeout(ctx, 3*time.Second)
 }
