@@ -17,6 +17,7 @@ func NewOrderService(repo repository.IOrderRepository) *OrderService {
 
 type IOrderService interface {
 	CreateOrder(order model.Order) error
+	GetOrder(order_uid string) (model.Order, error)
 }
 
 func (serv *OrderService) validateOrderInfo(order model.Order) error {
@@ -129,4 +130,8 @@ func (serv *OrderService) CreateOrder(order model.Order) error {
 		return err
 	}
 	return serv.repo.InsertOrder(order)
+}
+
+func (serv *OrderService) GetOrder(orderUid string) (model.Order, error) {
+	return serv.repo.GetOrder(orderUid)
 }

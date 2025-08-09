@@ -1,8 +1,10 @@
 package repository
 
 import (
+	"errors"
 	"gorm.io/gorm"
 	"log"
+	"strings"
 	"wb_lvl0/internal/model"
 )
 
@@ -16,10 +18,11 @@ func NewOrderRepository(db *gorm.DB) *OrderRepository {
 
 type IOrderRepository interface {
 	InsertOrder(order model.Order) error
+	GetOrder(orderUid string) (model.Order, error)
 }
 
 func (repo *OrderRepository) InsertOrder(order model.Order) error {
-	var itemsToInsert []model.ItemToInsert
+	var itemsToInsert []model.ItemDB
 	tx := repo.db.Begin()
 	defer func() {
 		if r := recover(); r != nil {
@@ -32,9 +35,10 @@ func (repo *OrderRepository) InsertOrder(order model.Order) error {
 	}
 
 	// TODO: Вынести перенос данных структуры для вставки в отдельные функции
+	// TODO: Сделать внятные сообщения об ошибках (которые в return)
 
 	// Вставка данных о payment
-	paymentToInsert := model.PaymentToInsert{
+	paymentToInsert := model.PaymentDB{
 		Payment: order.Payment,
 	}
 	if err := tx.Table("payments").Create(&paymentToInsert).Error; err != nil {
@@ -44,7 +48,7 @@ func (repo *OrderRepository) InsertOrder(order model.Order) error {
 	}
 
 	// Вставка данных о delivery
-	deliveryToInsert := model.DeliveryToInsert{
+	deliveryToInsert := model.DeliveryDB{
 		Delivery: order.Delivery,
 	}
 	if err := tx.Table("delivery_params").Create(&deliveryToInsert).Error; err != nil {
@@ -54,7 +58,7 @@ func (repo *OrderRepository) InsertOrder(order model.Order) error {
 	}
 
 	// Вставка данных о order
-	orderToInsert := model.OrderToInsert{
+	orderToInsert := model.OrderDB{
 		OrderUid:          order.OrderUid,
 		TrackNumber:       order.TrackNumber,
 		Entry:             order.Entry,
@@ -77,7 +81,7 @@ func (repo *OrderRepository) InsertOrder(order model.Order) error {
 
 	// Вставка данных о items
 	for _, it := range order.Items {
-		itemsToInsert = append(itemsToInsert, model.ItemToInsert{
+		itemsToInsert = append(itemsToInsert, model.ItemDB{
 			Item:     it,
 			OrderUid: order.OrderUid,
 		})
@@ -89,4 +93,79 @@ func (repo *OrderRepository) InsertOrder(order model.Order) error {
 	}
 
 	return tx.Commit().Error
+}
+
+func (repo *OrderRepository) GetOrder(orderUid string) (model.Order, error) {
+	var order model.Order
+	var orderDB model.OrderDB
+	var paymentDB model.PaymentDB
+	var deliveryDB model.DeliveryDB
+	var itemsDB []model.ItemDB
+
+	err := repo.db.Table("orders").Where("order_uid = ?", orderUid).First(&orderDB).Error
+	if err != nil {
+		if errors.Is(err, gorm.ErrRecordNotFound) {
+			return order, errors.New("order not found")
+		}
+		if strings.Contains(err.Error(), "invalid input syntax for type uuid") {
+			return order, errors.New("invalid UUID format")
+		}
+	}
+
+	err = repo.db.Table("payments").Where("id = ?", orderDB.PaymentId).First(&paymentDB).Error
+	if err != nil {
+		if err.Error() == "sql: no rows in result set" {
+			return order, errors.New("order not found")
+		}
+		return order, err
+	}
+
+	err = repo.db.Table("delivery_params").Where("id = ?", orderDB.DeliveryParamsId).First(&deliveryDB).Error
+	if err != nil {
+		if err.Error() == "sql: no rows in result set" {
+			return order, errors.New("order not found")
+		}
+		return order, err
+	}
+
+	err = repo.db.Table("ordered_items").Where("order_uid = ?", orderDB.OrderUid).Find(&itemsDB).Error
+	if err != nil {
+		if err.Error() == "sql: no rows in result set" {
+			return order, errors.New("order not found")
+		}
+		return order, err
+	}
+
+	return repo.convertOrdersDbToOrder(orderDB, itemsDB, deliveryDB, paymentDB), nil
+}
+
+func (repo *OrderRepository) convertOrdersDbToOrder(orderDB model.OrderDB, itemsDB []model.ItemDB, deliveryDB model.DeliveryDB, paymentDB model.PaymentDB) model.Order {
+	var order model.Order
+	// Заполнение основных полей
+	order.OrderUid = orderDB.OrderUid
+	order.TrackNumber = orderDB.TrackNumber
+	order.Entry = orderDB.Entry
+	order.Locale = orderDB.Locale
+	order.InternalSignature = orderDB.InternalSignature
+	order.CustomerId = orderDB.CustomerId
+	order.DeliveryService = orderDB.DeliveryService
+	order.Shardkey = orderDB.Shardkey
+	order.SmId = orderDB.SmId
+	order.DateCreated = orderDB.DateCreated
+	order.OofShard = orderDB.OofShard
+
+	// Заполнение вложенных полей
+	order.Items = repo.convertItemsDbToItems(itemsDB)
+	order.Delivery = deliveryDB.Delivery
+	order.Payment = paymentDB.Payment
+
+	return order
+}
+
+func (repo *OrderRepository) convertItemsDbToItems(itemsDb []model.ItemDB) []model.Item {
+	var items []model.Item
+	for _, item := range itemsDb {
+		items = append(items, item.Item)
+	}
+	return items
 }

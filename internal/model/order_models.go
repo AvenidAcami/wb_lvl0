@@ -54,22 +54,22 @@ type Order struct {
 	OofShard          string   `json:"oof_shard" binding:"required"`
 }
 
-type ItemToInsert struct {
+type ItemDB struct {
 	Item
 	OrderUid string `json:"order_uid"`
 }
 
-type DeliveryToInsert struct {
+type DeliveryDB struct {
 	Delivery
 	Id int `json:"id"`
 }
 
-type PaymentToInsert struct {
+type PaymentDB struct {
 	Payment
 	Id int `json:"id"`
 }
 
-type OrderToInsert struct {
+type OrderDB struct {
 	OrderUid          string `json:"order_uid" binding:"required"`
 	TrackNumber       string `json:"track_number" binding:"required"`
 	Entry             string `json:"entry" binding:"required"`
