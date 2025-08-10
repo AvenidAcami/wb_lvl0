@@ -7,9 +7,10 @@ import (
 
 func InitKafka() *kafka.Reader {
 	reader := kafka.NewReader(kafka.ReaderConfig{
-		Brokers: []string{"kafka:9092"},
-		Topic:   "orders",
-		GroupID: "order-consumers",
+		Brokers:  []string{"kafka:9092"},
+		Topic:    "orders",
+		GroupID:  "order-consumers",
+		MaxBytes: 10e6,
 	})
 	log.Println("Init kafka reader")
 	return reader

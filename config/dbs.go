@@ -2,9 +2,11 @@ package config
 
 import (
 	"fmt"
+	"github.com/gomodule/redigo/redis"
 	"gorm.io/driver/postgres"
 	"gorm.io/gorm"
 	"log"
+	"time"
 )
 
 func InitPostgres() *gorm.DB {
@@ -38,4 +40,22 @@ func InitPostgres() *gorm.DB {
 		log.Fatalf("DB_PORT: %w", err)
 	}
 	return db
+}
+
+func InitRedis() *redis.Pool {
+	redisPool := &redis.Pool{
+		MaxIdle:   10,
+		MaxActive: 100,
+		Dial: func() (redis.Conn, error) {
+			return redis.Dial("tcp", "redis:6379")
+		},
+		TestOnBorrow: func(c redis.Conn, t time.Time) error {
+			_, err := c.Do("PING")
+			if err != nil {
+				log.Panicln("redis ping error:", err)
+			}
+			return err
+		},
+	}
+	return redisPool
 }

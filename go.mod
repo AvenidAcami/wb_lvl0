@@ -4,6 +4,7 @@ go 1.24.5
 
 require (
 	github.com/gin-gonic/gin v1.10.1
+	github.com/gomodule/redigo v1.9.2
 	github.com/joho/godotenv v1.5.1
 	github.com/segmentio/kafka-go v0.4.48
 	gorm.io/driver/postgres v1.6.0

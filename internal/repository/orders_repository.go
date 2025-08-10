@@ -2,19 +2,24 @@ package repository
 
 import (
 	"context"
+	"encoding/json"
 	"errors"
+	"github.com/gomodule/redigo/redis"
 	"gorm.io/gorm"
 	"log"
 	"strings"
+	"time"
 	"wb_lvl0/internal/model"
 )
 
 type OrderRepository struct {
-	db *gorm.DB
+	db  *gorm.DB
+	rdb *redis.Pool
 }
 
-func NewOrderRepository(db *gorm.DB) *OrderRepository {
-	return &OrderRepository{db: db}
+func NewOrderRepository(db *gorm.DB, rdb *redis.Pool) *OrderRepository {
+	return &OrderRepository{db: db,
+		rdb: rdb}
 }
 
 type IOrderRepository interface {
@@ -22,21 +27,16 @@ type IOrderRepository interface {
 	GetOrder(orderUid string, ctx context.Context) (model.Order, error)
 }
 
-func (repo *OrderRepository) InsertOrder(order model.Order) error {
+func (repo *OrderRepository) insertOrderTransaction(ctx context.Context, order model.Order) error {
 	var itemsToInsert []model.ItemDB
-	tx := repo.db.Begin()
-	defer func() {
-		if r := recover(); r != nil {
-			tx.Rollback()
-		}
-	}()
+	tx := repo.db.WithContext(ctx).Begin()
+	defer tx.Rollback()
 
 	if err := tx.Error; err != nil {
 		return err
 	}
 
 	// TODO: Вынести перенос данных структуры для вставки в отдельные функции
-	// TODO: Сделать внятные сообщения об ошибках (которые в return)
 
 	// Вставка данных о payment
 	paymentToInsert := model.PaymentDB{
@@ -44,8 +44,7 @@ func (repo *OrderRepository) InsertOrder(order model.Order) error {
 	}
 	if err := tx.Table("payments").Create(&paymentToInsert).Error; err != nil {
 		tx.Rollback()
-		log.Println("Ошибка во время вставки payment")
-		return err
+		return errors.New("something wrong with data in payment section")
 	}
 
 	// Вставка данных о delivery
@@ -54,8 +53,7 @@ func (repo *OrderRepository) InsertOrder(order model.Order) error {
 	}
 	if err := tx.Table("delivery_params").Create(&deliveryToInsert).Error; err != nil {
 		tx.Rollback()
-		log.Println("Ошибка во время вставки delivery")
-		return err
+		return errors.New("something wrong with data in delivery section")
 	}
 
 	// Вставка данных о order
@@ -76,8 +74,7 @@ func (repo *OrderRepository) InsertOrder(order model.Order) error {
 	}
 	if err := tx.Table("orders").Create(&orderToInsert).Error; err != nil {
 		tx.Rollback()
-		log.Println("Ошибка во время вставки order")
-		return err
+		return errors.New("something wrong with data in order section")
 	}
 
 	// Вставка данных о items
@@ -89,11 +86,52 @@ func (repo *OrderRepository) InsertOrder(order model.Order) error {
 	}
 	if err := tx.Table("ordered_items").Create(&itemsToInsert).Error; err != nil {
 		tx.Rollback()
-		log.Println("Ошибка во время вставки items")
-		return err
+		return errors.New("something wrong with data in item section")
 	}
 
 	return tx.Commit().Error
+}
+
+func (repo *OrderRepository) InsertOrder(order model.Order) error {
+	var err error
+	retries := 5
+
+	conn := repo.rdb.Get()
+	defer conn.Close()
+
+	for i := 1; i <= retries; i++ {
+		ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+		err = repo.insertOrderTransaction(ctx, order)
+		cancel()
+		if err == nil {
+			redisOrder, err := json.Marshal(&order)
+			if err == nil {
+
+				_, err = conn.Do("SETEX", "order:"+order.OrderUid, 300, redisOrder)
+				if err != nil {
+					log.Println(err)
+				}
+			} else {
+				log.Println(err)
+			}
+			return nil
+		}
+
+		if strings.Contains(err.Error(), "something wrong with data") {
+			return err
+		}
+
+		if strings.Contains(err.Error(), "duplicate key value violates unique constraint \"orders_pkey\"") {
+			return errors.New("order already exists")
+		}
+
+		if i < retries {
+			time.Sleep(1 * time.Second)
+		}
+
+	}
+
+	return errors.New("something went wrong")
 }
 
 func (repo *OrderRepository) GetOrder(orderUid string, ctx context.Context) (model.Order, error) {
@@ -103,7 +141,22 @@ func (repo *OrderRepository) GetOrder(orderUid string, ctx context.Context) (mod
 	var deliveryDB model.DeliveryDB
 	var itemsDB []model.ItemDB
 
-	err := repo.db.WithContext(ctx).Table("orders").Where("order_uid = ?", orderUid).First(&orderDB).Error
+	conn := repo.rdb.Get()
+	defer conn.Close()
+
+	data, err := redis.Bytes(conn.Do("GET", "order:"+orderUid))
+	if err == nil {
+		err = json.Unmarshal(data, &order)
+		if err == nil {
+			return order, nil
+		} else {
+			log.Println(err)
+		}
+	} else {
+		log.Println(err)
+	}
+
+	err = repo.db.WithContext(ctx).Table("orders").Where("order_uid = ?", orderUid).First(&orderDB).Error
 	if err != nil {
 		if errors.Is(err, gorm.ErrRecordNotFound) {
 			return order, errors.New("order not found")
@@ -138,7 +191,19 @@ func (repo *OrderRepository) GetOrder(orderUid string, ctx context.Context) (mod
 		return order, err
 	}
 
-	return repo.convertOrdersDbToOrder(orderDB, itemsDB, deliveryDB, paymentDB), nil
+	order = repo.convertOrdersDbToOrder(orderDB, itemsDB, deliveryDB, paymentDB)
+
+	redisOrder, err := json.Marshal(&order)
+	if err == nil {
+		_, err = conn.Do("SETEX", "order:"+orderUid, 300, redisOrder)
+		if err != nil {
+			log.Println(err)
+		}
+	} else {
+		log.Println(err)
+	}
+
+	return order, nil
 }
 
 func (repo *OrderRepository) convertOrdersDbToOrder(orderDB model.OrderDB, itemsDB []model.ItemDB, deliveryDB model.DeliveryDB, paymentDB model.PaymentDB) model.Order {

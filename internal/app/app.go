@@ -14,8 +14,9 @@ func Run() {
 	r := gin.Default()
 	config.InitENV()
 	db := config.InitPostgres()
+	redisPool := config.InitRedis()
 
-	orderRepository := repository.NewOrderRepository(db)
+	orderRepository := repository.NewOrderRepository(db, redisPool)
 	orderService := service.NewOrderService(orderRepository)
 	orderController := controller.NewOrdersController(orderService)
 	// TODO: Добавить редис и кэширование первого уровня
