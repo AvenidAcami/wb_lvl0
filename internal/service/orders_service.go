@@ -2,8 +2,11 @@ package service
 
 import (
 	"context"
+	"encoding/json"
 	"errors"
 	"fmt"
+	"github.com/gomodule/redigo/redis"
+	"log"
 	"time"
 	"wb_lvl0/internal/model"
 	"wb_lvl0/internal/repository"
@@ -11,15 +14,17 @@ import (
 
 type OrderService struct {
 	repo repository.IOrderRepository
+	rdb  *redis.Pool
 }
 
-func NewOrderService(repo repository.IOrderRepository) *OrderService {
-	return &OrderService{repo: repo}
+func NewOrderService(repo repository.IOrderRepository, rdb *redis.Pool) *OrderService {
+	return &OrderService{repo: repo, rdb: rdb}
 }
 
 type IOrderService interface {
 	CreateOrder(order model.Order) error
 	GetOrder(ctx context.Context, orderUid string) (model.Order, error)
+	RestoreCache() error
 }
 
 func (serv *OrderService) validateOrderInfo(order model.Order) error {
@@ -132,15 +137,88 @@ func (serv *OrderService) CreateOrder(order model.Order) error {
 	if err != nil {
 		return err
 	}
+
+	conn := serv.rdb.Get()
+	defer conn.Close()
+	serv.setOrderInRedis(conn, order)
+
 	return serv.repo.InsertOrder(order)
 }
 
 func (serv *OrderService) GetOrder(ctx context.Context, orderUid string) (model.Order, error) {
-	timeoutCtx, cancel := serv.createContext(ctx)
+	timeoutCtx, cancel := serv.createContext(ctx, 3)
 	defer cancel()
-	return serv.repo.GetOrder(orderUid, timeoutCtx)
+
+	conn := serv.rdb.Get()
+	defer conn.Close()
+
+	order, err := serv.getOrderFromRedis(conn, orderUid)
+	if err == nil {
+		return order, nil
+	} else {
+		log.Println("getOrderFromRedis error:", err)
+	}
+
+	order, err = serv.repo.GetOrder(orderUid, timeoutCtx)
+	if err != nil {
+		return model.Order{}, err
+	}
+
+	serv.setOrderInRedis(conn, order)
+	return order, nil
 }
 
-func (serv *OrderService) createContext(ctx context.Context) (context.Context, context.CancelFunc) {
-	return context.WithTimeout(ctx, 3*time.Second)
+func (serv *OrderService) createContext(ctx context.Context, seconds time.Duration) (context.Context, context.CancelFunc) {
+	return context.WithTimeout(ctx, seconds*time.Second)
+}
+
+func (serv *OrderService) RestoreCache() error {
+	ctx, cancel := serv.createContext(context.Background(), 5)
+	defer cancel()
+	orders, err := serv.repo.GetLastOrders(ctx)
+	if err != nil {
+		return err
+	}
+
+	conn := serv.rdb.Get()
+	defer conn.Close()
+
+	for _, order := range orders {
+		orderstr, err := json.Marshal(order)
+		if err != nil {
+			continue
+		}
+		_, _ = conn.Do("SETEX", "order:"+order.OrderUid, 300, orderstr)
+	}
+	return nil
+}
+
+func (serv *OrderService) setOrderInRedis(conn redis.Conn, order model.Order) {
+
+	redisOrder, err := json.Marshal(&order)
+	if err == nil {
+		_, err = conn.Do("SETEX", "order:"+order.OrderUid, 300, redisOrder)
+		if err != nil {
+			log.Println(err)
+		}
+	} else {
+		log.Println(err)
+	}
+}
+
+func (serv *OrderService) getOrderFromRedis(conn redis.Conn, orderUid string) (model.Order, error) {
+	var order model.Order
+
+	data, err := redis.Bytes(conn.Do("GET", "order:"+orderUid))
+	if err == nil {
+		err = json.Unmarshal(data, &order)
+		if err == nil {
+			return order, nil
+		} else {
+			return model.Order{}, err
+		}
+	} else {
+		log.Println(err)
+	}
+	return order, err
 }

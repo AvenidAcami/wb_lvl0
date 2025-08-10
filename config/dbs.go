@@ -44,8 +44,10 @@ func InitPostgres() *gorm.DB {
 
 func InitRedis() *redis.Pool {
 	redisPool := &redis.Pool{
-		MaxIdle:   10,
-		MaxActive: 100,
+		MaxIdle:     10,
+		MaxActive:   100,
+		IdleTimeout: 240 * time.Second,
+		Wait:        true,
 		Dial: func() (redis.Conn, error) {
 			return redis.Dial("tcp", "redis:6379")
 		},
@@ -57,5 +59,17 @@ func InitRedis() *redis.Pool {
 			return err
 		},
 	}
+
+	conn := redisPool.Get()
+	defer conn.Close()
+	_, err := conn.Do("CONFIG", "SET", "maxmemory", "256mb")
+	if err != nil {
+		log.Panicln("redis config error:", err)
+	}
+	_, err = conn.Do("CONFIG", "SET", "maxmemory-policy", "allkeys-lru")
+	if err != nil {
+		log.Panicln("redis config error:", err)
+	}
+
 	return redisPool
 }

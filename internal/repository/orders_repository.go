@@ -2,29 +2,25 @@ package repository
 
 import (
 	"context"
-	"encoding/json"
 	"errors"
-	"github.com/gomodule/redigo/redis"
 	"gorm.io/gorm"
-	"log"
 	"strings"
 	"time"
 	"wb_lvl0/internal/model"
 )
 
 type OrderRepository struct {
-	db  *gorm.DB
-	rdb *redis.Pool
+	db *gorm.DB
 }
 
-func NewOrderRepository(db *gorm.DB, rdb *redis.Pool) *OrderRepository {
-	return &OrderRepository{db: db,
-		rdb: rdb}
+func NewOrderRepository(db *gorm.DB) *OrderRepository {
+	return &OrderRepository{db: db}
 }
 
 type IOrderRepository interface {
 	InsertOrder(order model.Order) error
 	GetOrder(orderUid string, ctx context.Context) (model.Order, error)
+	GetLastOrders(ctx context.Context) ([]model.Order, error)
 }
 
 func (repo *OrderRepository) insertOrderTransaction(ctx context.Context, order model.Order) error {
@@ -96,24 +92,11 @@ func (repo *OrderRepository) InsertOrder(order model.Order) error {
 	var err error
 	retries := 5
 
-	conn := repo.rdb.Get()
-	defer conn.Close()
-
 	for i := 1; i <= retries; i++ {
 		ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
 		err = repo.insertOrderTransaction(ctx, order)
 		cancel()
 		if err == nil {
-			redisOrder, err := json.Marshal(&order)
-			if err == nil {
-
-				_, err = conn.Do("SETEX", "order:"+order.OrderUid, 300, redisOrder)
-				if err != nil {
-					log.Println(err)
-				}
-			} else {
-				log.Println(err)
-			}
 			return nil
 		}
 
@@ -135,28 +118,22 @@ func (repo *OrderRepository) InsertOrder(order model.Order) error {
 }
 
 func (repo *OrderRepository) GetOrder(orderUid string, ctx context.Context) (model.Order, error) {
+	order, err := repo.getOrderData(ctx, orderUid)
+	if err != nil {
+		return order, err
+	}
+
+	return order, nil
+}
+
+func (repo *OrderRepository) getOrderData(ctx context.Context, orderUid string) (model.Order, error) {
 	var order model.Order
 	var orderDB model.OrderDB
 	var paymentDB model.PaymentDB
 	var deliveryDB model.DeliveryDB
 	var itemsDB []model.ItemDB
 
-	conn := repo.rdb.Get()
-	defer conn.Close()
-
-	data, err := redis.Bytes(conn.Do("GET", "order:"+orderUid))
-	if err == nil {
-		err = json.Unmarshal(data, &order)
-		if err == nil {
-			return order, nil
-		} else {
-			log.Println(err)
-		}
-	} else {
-		log.Println(err)
-	}
-
-	err = repo.db.WithContext(ctx).Table("orders").Where("order_uid = ?", orderUid).First(&orderDB).Error
+	err := repo.db.WithContext(ctx).Table("orders").Where("order_uid = ?", orderUid).First(&orderDB).Error
 	if err != nil {
 		if errors.Is(err, gorm.ErrRecordNotFound) {
 			return order, errors.New("order not found")
@@ -192,17 +169,6 @@ func (repo *OrderRepository) GetOrder(orderUid string, ctx context.Context) (mod
 	}
 
 	order = repo.convertOrdersDbToOrder(orderDB, itemsDB, deliveryDB, paymentDB)
-
-	redisOrder, err := json.Marshal(&order)
-	if err == nil {
-		_, err = conn.Do("SETEX", "order:"+orderUid, 300, redisOrder)
-		if err != nil {
-			log.Println(err)
-		}
-	} else {
-		log.Println(err)
-	}
-
 	return order, nil
 }
 
@@ -235,4 +201,21 @@ func (repo *OrderRepository) convertItemsDbToItems(itemsDb []model.ItemDB) []mod
 		items = append(items, item.Item)
 	}
 	return items
+}
+
+func (repo *OrderRepository) GetLastOrders(ctx context.Context) ([]model.Order, error) {
+	var lastOrdersUids []string
+	var lastOrders []model.Order
+
+	err := repo.db.Table("orders").Order("date_created DESC").Limit(1000).Select("order_uid").Find(&lastOrdersUids).Error
+	if err != nil {
+		return lastOrders, err
+	}
+
+	for _, uid := range lastOrdersUids {
+		order, _ := repo.getOrderData(ctx, uid)
+		lastOrders = append(lastOrders, order)
+	}
+
+	return lastOrders, nil
 }

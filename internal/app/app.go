@@ -2,6 +2,7 @@ package app
 
 import (
 	"github.com/gin-gonic/gin"
+	"log"
 	"wb_lvl0/config"
 	"wb_lvl0/internal/controller"
 	"wb_lvl0/internal/kafka"
@@ -16,11 +17,14 @@ func Run() {
 	db := config.InitPostgres()
 	redisPool := config.InitRedis()
 
-	orderRepository := repository.NewOrderRepository(db, redisPool)
-	orderService := service.NewOrderService(orderRepository)
+	orderRepository := repository.NewOrderRepository(db)
+	orderService := service.NewOrderService(orderRepository, redisPool)
+
+	err := orderService.RestoreCache()
+	if err != nil {
+		log.Println("Error restoring cache")
+	}
 	orderController := controller.NewOrdersController(orderService)
-	// TODO: Добавить редис и кэширование первого уровня
-	// TODO: Добавит тесты
 
 	reader := config.InitKafka()
 	go kafka.ParseOrders(reader, orderService)
