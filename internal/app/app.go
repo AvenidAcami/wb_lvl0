@@ -1,8 +1,10 @@
 package app
 
 import (
+	"github.com/gin-contrib/cors"
 	"github.com/gin-gonic/gin"
 	"log"
+	"time"
 	"wb_lvl0/config"
 	"wb_lvl0/internal/controller"
 	"wb_lvl0/internal/kafka"
@@ -13,6 +15,15 @@ import (
 
 func Run() {
 	r := gin.Default()
+
+	r.Use(cors.New(cors.Config{
+		AllowOrigins:     []string{"*"},
+		AllowMethods:     []string{"GET", "POST", "PUT", "DELETE", "OPTIONS"},
+		AllowHeaders:     []string{"Origin", "Content-Type", "Accept"},
+		ExposeHeaders:    []string{"Content-Length"},
+		AllowCredentials: true,
+		MaxAge:           12 * time.Hour,
+	}))
 	config.InitENV()
 	db := config.InitPostgres()
 	redisPool := config.InitRedis()

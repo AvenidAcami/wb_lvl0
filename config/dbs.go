@@ -17,7 +17,7 @@ const migrationsDir = "migrations"
 //go:embed migrations/*.sql
 var MigrationsFS embed.FS
 
-func createDatabaseIfNotExists(dbPass, dbHost, dbPort, dbName string) error {
+func restoreData(dbPass, dbHost, dbPort, dbName string) error {
 	connStr := fmt.Sprintf("host=%s port=%s user=postgres password=%s dbname=postgres sslmode=disable",
 		dbHost, dbPort, dbPass)
 	db, err := sql.Open("postgres", connStr)
@@ -83,8 +83,7 @@ func InitPostgres() *gorm.DB {
 		log.Fatalf("DB_PORT: %w", err)
 	}
 
-	//TODO: Переименовать этот метод
-	err = createDatabaseIfNotExists(dbPass, dbHost, dbPort, dbName)
+	err = restoreData(dbPass, dbHost, dbPort, dbName)
 	if err != nil {
 		log.Fatalln("Failed to create database:", err)
 	}

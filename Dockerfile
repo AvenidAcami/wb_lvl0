@@ -15,5 +15,7 @@ RUN chmod +x /wait-for-it.sh
 
 
 EXPOSE 8080
-CMD ["/bin/sh", "-c", "/wait-for-it.sh postgres:5432 -- /wait-for-it.sh redis:6379 -- sleep 20 && ./main"]
+CMD ["/bin/sh", "-c", "/wait-for-it.sh postgres:5432 -- /wait-for-it.sh redis:6379 -- ./main"]
+
+
 
