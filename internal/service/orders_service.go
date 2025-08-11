@@ -161,6 +161,7 @@ func (serv *OrderService) GetOrder(ctx context.Context, orderUid string) (model.
 
 	order, err = serv.repo.GetOrder(orderUid, timeoutCtx)
 	if err != nil {
+		log.Println(err)
 		return model.Order{}, err
 	}
 
