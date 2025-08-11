@@ -1,0 +1,38 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+    <meta charset="UTF-8" />
+</head>
+<body>
+<input type="text" id="uid" placeholder="Enter order uid" />
+<button onclick="fetchOrder()">Enter</button>
+
+<pre id="result"></pre>
+
+<script>
+    async function fetchOrder() {
+        const uid = document.getElementById('uid').value.trim();
+        const resultEl = document.getElementById('result');
+
+
+        try {
+            const response = await fetch(`http://localhost:8080/order/${encodeURIComponent(uid)}`);
+
+            if (!response.ok) {
+                if(response.status === 404) {
+                    resultEl.textContent = 'Order not found';
+                } else {
+                    resultEl.textContent = 'Error: ' + response.status;
+                }
+                return;
+            }
+
+            const data = await response.json();
+            resultEl.textContent = JSON.stringify(data, null, 2);
+        } catch (error) {
+            resultEl.textContent = 'Error: ' + error.message;
+        }
+    }
+</script>
+</body>
+</html>
