@@ -24,21 +24,26 @@ func Run() {
 		AllowCredentials: true,
 		MaxAge:           12 * time.Hour,
 	}))
+
+	// Инициализация компонентов
 	config.InitENV()
 	db := config.InitPostgres()
 	redisPool := config.InitRedis()
+	reader := config.InitKafka()
 
 	orderRepository := repository.NewOrderRepository(db)
 	orderService := service.NewOrderService(orderRepository, redisPool)
+	orderController := controller.NewOrdersController(orderService)
+	router.InitOrderRoutes(r, orderController)
 
+	// Восстановление кэша (1000 последних записей)
 	err := orderService.RestoreCache()
 	if err != nil {
 		log.Println("Error restoring cache")
 	}
-	orderController := controller.NewOrdersController(orderService)
 
-	reader := config.InitKafka()
+	// Запуск консьюмера
 	go kafka.ParseOrders(reader, orderService)
-	router.InitOrderRoutes(r, orderController)
+
 	r.Run(":8080")
 }

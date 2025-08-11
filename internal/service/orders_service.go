@@ -4,7 +4,6 @@ import (
 	"context"
 	"encoding/json"
 	"errors"
-	"fmt"
 	"github.com/gomodule/redigo/redis"
 	"log"
 	"time"
@@ -114,18 +113,20 @@ func (serv *OrderService) validateOrderInfo(order model.Order) error {
 }
 
 func (serv *OrderService) validateRequiredStrings(fields map[string]string) error {
+	// Проверка существования каких-либо данных в каждом значении fields (строчного типа)
 	for name, value := range fields {
 		if value == "" {
-			return fmt.Errorf("%s is required", name)
+			return errors.New(name + "%s is required")
 		}
 	}
 	return nil
 }
 
 func (serv *OrderService) validateRequiredInts(fields map[string]int) error {
+	// Проверка существования каких-либо данных в каждом значении fields (целочисленного типа)
 	for name, value := range fields {
 		if value == 0 {
-			return fmt.Errorf("%s is required", name)
+			return errors.New(name + "%s is required")
 
 		}
 	}
@@ -133,16 +134,22 @@ func (serv *OrderService) validateRequiredInts(fields map[string]int) error {
 }
 
 func (serv *OrderService) CreateOrder(order model.Order) error {
+	// Проверка всех полей заказа
 	err := serv.validateOrderInfo(order)
 	if err != nil {
 		return err
 	}
 
-	conn := serv.rdb.Get()
-	defer conn.Close()
-	serv.setOrderInRedis(conn, order)
+	// Сохранение данных о заказе в бд
+	err = serv.repo.InsertOrder(order)
+	if err == nil {
+		// Сохранение данных о заказе в кэше
+		conn := serv.rdb.Get()
+		defer conn.Close()
+		serv.setOrderInRedis(conn, order)
+	}
 
-	return serv.repo.InsertOrder(order)
+	return nil
 }
 
 func (serv *OrderService) GetOrder(ctx context.Context, orderUid string) (model.Order, error) {
@@ -152,6 +159,7 @@ func (serv *OrderService) GetOrder(ctx context.Context, orderUid string) (model.
 	conn := serv.rdb.Get()
 	defer conn.Close()
 
+	// Получение данных о заказе из кэша
 	order, err := serv.getOrderFromRedis(conn, orderUid)
 	if err == nil {
 		return order, nil
@@ -159,12 +167,14 @@ func (serv *OrderService) GetOrder(ctx context.Context, orderUid string) (model.
 		log.Println("getOrderFromRedis error:", err)
 	}
 
+	// Получение данных из бд
 	order, err = serv.repo.GetOrder(orderUid, timeoutCtx)
 	if err != nil {
 		log.Println(err)
 		return model.Order{}, err
 	}
 
+	// Сохранение данных о заказе в кэше
 	serv.setOrderInRedis(conn, order)
 	return order, nil
 }
@@ -176,6 +186,8 @@ func (serv *OrderService) createContext(ctx context.Context, seconds time.Durati
 func (serv *OrderService) RestoreCache() error {
 	ctx, cancel := serv.createContext(context.Background(), 5)
 	defer cancel()
+
+	// Получение последней 1000 заказов из бд
 	orders, err := serv.repo.GetLastOrders(ctx)
 	if err != nil {
 		return err
@@ -184,6 +196,7 @@ func (serv *OrderService) RestoreCache() error {
 	conn := serv.rdb.Get()
 	defer conn.Close()
 
+	// Кэширование данных о последних заказах из бд
 	for _, order := range orders {
 		orderstr, err := json.Marshal(order)
 		if err != nil {
@@ -195,7 +208,7 @@ func (serv *OrderService) RestoreCache() error {
 }
 
 func (serv *OrderService) setOrderInRedis(conn redis.Conn, order model.Order) {
-
+	// Сохранение данных о заказе в кэш
 	redisOrder, err := json.Marshal(&order)
 	if err == nil {
 		_, err = conn.Do("SETEX", "order:"+order.OrderUid, 300, redisOrder)
@@ -209,7 +222,7 @@ func (serv *OrderService) setOrderInRedis(conn redis.Conn, order model.Order) {
 
 func (serv *OrderService) getOrderFromRedis(conn redis.Conn, orderUid string) (model.Order, error) {
 	var order model.Order
-
+	// Получение данных из кэша по uid
 	data, err := redis.Bytes(conn.Do("GET", "order:"+orderUid))
 	if err == nil {
 		err = json.Unmarshal(data, &order)

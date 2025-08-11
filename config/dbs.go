@@ -83,6 +83,7 @@ func InitPostgres() *gorm.DB {
 		log.Fatalf("DB_PORT: %w", err)
 	}
 
+	// Создание бд если не создана
 	err = restoreData(dbPass, dbHost, dbPort, dbName)
 	if err != nil {
 		log.Fatalln("Failed to create database:", err)
@@ -129,6 +130,8 @@ func InitRedis() *redis.Pool {
 
 	conn := redisPool.Get()
 	defer conn.Close()
+
+	// Настройка конфига редиса
 	_, err := conn.Do("CONFIG", "SET", "maxmemory", "256mb")
 	if err != nil {
 		log.Panicln("redis config error:", err)

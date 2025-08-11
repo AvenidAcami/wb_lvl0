@@ -11,7 +11,9 @@ import (
 
 func ParseOrders(reader *kafka.Reader, orderService service.IOrderService) {
 	var order model.Order
-	log.Println("Start parse orders")
+	log.Println("Order processing has begun")
+
+	// Бесконечный цикл получения заказов от кафки
 	for {
 		m, err := reader.ReadMessage(context.Background())
 		if err != nil {

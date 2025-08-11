@@ -25,6 +25,8 @@ type IOrderRepository interface {
 
 func (repo *OrderRepository) insertOrderTransaction(ctx context.Context, order model.Order) error {
 	var itemsToInsert []model.ItemDB
+
+	// Создание транзакции с использованием контекста
 	tx := repo.db.WithContext(ctx).Begin()
 	defer tx.Rollback()
 
@@ -133,6 +135,7 @@ func (repo *OrderRepository) getOrderData(ctx context.Context, orderUid string) 
 	var deliveryDB model.DeliveryDB
 	var itemsDB []model.ItemDB
 
+	// Получение частей заказа
 	err := repo.db.WithContext(ctx).Table("orders").Where("order_uid = ?", orderUid).First(&orderDB).Error
 	if err != nil {
 		if errors.Is(err, gorm.ErrRecordNotFound) {
@@ -168,6 +171,7 @@ func (repo *OrderRepository) getOrderData(ctx context.Context, orderUid string) 
 		return order, err
 	}
 
+	// Преобразование частей заказа из бд в Order
 	order = repo.convertOrdersDbToOrder(orderDB, itemsDB, deliveryDB, paymentDB)
 	return order, nil
 }
@@ -207,6 +211,7 @@ func (repo *OrderRepository) GetLastOrders(ctx context.Context) ([]model.Order, 
 	var lastOrdersUids []string
 	var lastOrders []model.Order
 
+	// Получение 1000 последних заказов
 	err := repo.db.Table("orders").Order("date_created DESC").Limit(1000).Select("order_uid").Find(&lastOrdersUids).Error
 	if err != nil {
 		return lastOrders, err
