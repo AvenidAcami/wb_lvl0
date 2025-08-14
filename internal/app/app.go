@@ -45,5 +45,5 @@ func Run() {
 	// Запуск консьюмера
 	go kafka.ParseOrders(reader, orderService)
 
-	r.Run(":8080")
+	r.Run(":8081")
 }

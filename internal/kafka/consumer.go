@@ -10,17 +10,16 @@ import (
 )
 
 func ParseOrders(reader *kafka.Reader, orderService service.IOrderService) {
-	var order model.Order
-	log.Println("Order processing has begun")
-
 	// Бесконечный цикл получения заказов от кафки
 	for {
-		m, err := reader.ReadMessage(context.Background())
+		ctx := context.Background()
+		m, err := reader.ReadMessage(ctx)
 		if err != nil {
 			log.Println("Error reading message:", err)
 			continue
 		}
 		log.Println("Message received:", string(m.Value))
+		var order model.Order
 		err = json.Unmarshal(m.Value, &order)
 		if err != nil {
 			log.Println("Error unmarshalling message:", err)
@@ -30,6 +29,11 @@ func ParseOrders(reader *kafka.Reader, orderService service.IOrderService) {
 		err = orderService.CreateOrder(order)
 		if err != nil {
 			log.Println("Error creating order:", err)
+			continue
+		}
+		err = reader.CommitMessages(ctx, m)
+		if err != nil {
+			log.Println("Error committing message:", err)
 		}
 	}
 }

@@ -2,7 +2,7 @@ services:
   go:
     build: ./
     ports:
-      - "8080:8080"
+      - "8081:8081"
     volumes:
       - ./.env:/app/.env
     depends_on:
