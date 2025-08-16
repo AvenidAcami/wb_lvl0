@@ -34,7 +34,9 @@ func Run() {
 	orderRepository := repository.NewOrderRepository(db)
 	orderService := service.NewOrderService(orderRepository, redisPool)
 	orderController := controller.NewOrdersController(orderService)
+
 	router.InitOrderRoutes(r, orderController)
+	router.InitDocsRouter(r)
 
 	// Восстановление кэша (1000 последних записей)
 	err := orderService.RestoreCache()

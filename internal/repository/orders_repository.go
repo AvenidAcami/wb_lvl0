@@ -124,7 +124,6 @@ func (repo *OrderRepository) GetOrder(orderUid string, ctx context.Context) (mod
 	if err != nil {
 		return order, err
 	}
-
 	return order, nil
 }
 
