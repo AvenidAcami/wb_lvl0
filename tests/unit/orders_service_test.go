@@ -1,8 +1,9 @@
-package service
+package unit
 
 import (
 	"testing"
 	"wb_lvl0/internal/model"
+	"wb_lvl0/internal/service"
 )
 
 func TestOrderService_validateOrderInfo(t *testing.T) {
@@ -169,8 +170,8 @@ func TestOrderService_validateOrderInfo(t *testing.T) {
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			serv := &OrderService{}
-			if err := serv.validateOrderInfo(tt.args.order); (err != nil) != tt.wantErr {
+			serv := &service.OrderService{}
+			if err := serv.ValidateOrderInfo(tt.args.order); (err != nil) != tt.wantErr {
 				t.Errorf("validateOrderInfo() error = %v, wantErr %v", err, tt.wantErr)
 			}
 		})

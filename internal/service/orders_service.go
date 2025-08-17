@@ -26,7 +26,7 @@ type IOrderService interface {
 	RestoreCache() error
 }
 
-func (serv *OrderService) validateOrderInfo(order model.Order) error {
+func (serv *OrderService) ValidateOrderInfo(order model.Order) error {
 	// Проверка полей order
 	err := serv.validateRequiredStrings(map[string]string{
 		"order_uid":        order.OrderUid,
@@ -135,7 +135,7 @@ func (serv *OrderService) validateRequiredInts(fields map[string]int) error {
 
 func (serv *OrderService) CreateOrder(order model.Order) error {
 	// Проверка всех полей заказа
-	err := serv.validateOrderInfo(order)
+	err := serv.ValidateOrderInfo(order)
 	if err != nil {
 		return err
 	}
