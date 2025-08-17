@@ -16,18 +16,15 @@
 
 
         try {
-            const response = await fetch(`http://localhost:8080/order/${encodeURIComponent(uid)}`);
+            const response = await fetch(`http://localhost:8081/order/${encodeURIComponent(uid)}`);
+            const data = await response.json();
 
             if (!response.ok) {
-                if(response.status === 404) {
-                    resultEl.textContent = 'Order not found';
-                } else {
-                    resultEl.textContent = 'Error: ' + response.status;
-                }
+                resultEl.textContent = `Error ${response.status}: ${data.error}`;
                 return;
             }
 
-            const data = await response.json();
+
             resultEl.textContent = JSON.stringify(data, null, 2);
         } catch (error) {
             resultEl.textContent = 'Error: ' + error.message;
