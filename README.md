@@ -5,7 +5,7 @@
 ## Запуск:
 1. Клонировать репозиторий
  ```bash
-    git clone github.com/AvenidAcami/wb_lvl0.git
+    git clone https://github.com/AvenidAcami/wb_lvl0.git
     cd wb_lvl0
 ```
 2. Создать .env в соответствии с .env.example
