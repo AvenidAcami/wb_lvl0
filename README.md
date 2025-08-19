@@ -33,6 +33,8 @@
  - Golang
  - Docker
  - Docker compose
+ - PostgreSQL
+ - Kafka
  - Redis
 
 ## Структура
