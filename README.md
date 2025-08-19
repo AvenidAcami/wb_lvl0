@@ -5,7 +5,7 @@
 ## Запуск:
 1. Клонировать репозиторий
  ```bash
-    git clone github.com/AvenidAcami/wb_lvl0.git
+    git clone https://github.com/AvenidAcami/wb_lvl0.git
     cd wb_lvl0
 ```
 2. Создать .env в соответствии с .env.example
@@ -13,6 +13,10 @@
 ```bash
     docker compose up --build
 ```
+
+## Важно:
+ - Если нужно просто протестировать, то в .env в DB_USER нужно вписать wb_lvl0 и в DB_PASSWORD вписать test
+   (либо менять миграцию на создание пользователя и вставлять свои данные)
 
 ## Использование:
  - Получения заказа: 
